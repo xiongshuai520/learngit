@@ -1,0 +1,115 @@
+diff -Nrua a/arch/arm/lib/board.c b/arch/arm/lib/board.c
+--- a/arch/arm/lib/board.c	2015-03-10 15:12:36.000000000 +0800
++++ b/arch/arm/lib/board.c	2015-05-15 17:26:20.618968894 +0800
+@@ -51,7 +51,7 @@
+ #include <spi_flash.h>
+ #include <mmc.h>
+ #include <boot/customer.h>
+-
++#include <asm/io.h> //taoweijun 2015-2-3
+ #ifdef CONFIG_BITBANGMII
+ #include <miiphy.h>
+ #endif
+@@ -292,6 +292,14 @@
+ #if defined(CONFIG_VFD) || defined(CONFIG_LCD)
+ 	unsigned long addr;
+ #endif
++/*********************************************************/
++//taoweijun 2015-2-3
++/*********************************************************/
++  	hiwdt_write(HIWDT_UNLOCK_VAL, HIWDT_LOCK);
++	hiwdt_write(hiwdt_time, HIWDT_LOAD);
++	hiwdt_write(0x03, HIWDT_CTRL);
++  	hiwdt_write(0x01, HIWDT_LOCK);
++/*********************************************************/
+ 
+ 	/* Pointer is writable since we allocated a register for it */
+ 	gd = (gd_t*)(_armboot_start - CONFIG_SYS_MALLOC_LEN - sizeof(gd_t));
+diff -Nrua a/common/main.c b/common/main.c
+--- a/common/main.c	2015-03-10 15:12:36.000000000 +0800
++++ b/common/main.c	2015-05-15 17:40:20.878965125 +0800
+@@ -33,7 +33,7 @@
+ #ifdef CONFIG_MODEM_SUPPORT
+ #include <malloc.h>		/* for free() prototype */
+ #endif
+-
++#include <asm/io.h> //taoweijun 2015-2-3
+ #ifdef CONFIG_SYS_HUSH_PARSER
+ #include <hush.h>
+ #endif
+@@ -202,7 +202,21 @@
+ 	if (abort)
+ 		gd->flags &= ~GD_FLG_SILENT;
+ #endif
+-
++/*  taoweijun 2015-2-3  */
++if(1==abort)
++{
++    hiwdt_write(HIWDT_UNLOCK_VAL, HIWDT_LOCK);
++    hiwdt_write(0x00, HIWDT_CTRL);
++    hiwdt_write(0x01, HIWDT_LOCK);
++    printf("*******************************************\n");
++    printf("******** hisilicon watchdog off ***********\n");
++    printf("*******************************************\n");
++}
++else {
++    printf("******************************************\n");
++    printf("******** hisilicon watchdog on ***********\n");
++    printf("******************************************\n");
++}
+ 	return abort;
+ }
+ 
+diff -Nrua a/drivers/net/higmacv300/higmac.c b/drivers/net/higmacv300/higmac.c
+--- a/drivers/net/higmacv300/higmac.c	2015-03-10 15:12:36.000000000 +0800
++++ b/drivers/net/higmacv300/higmac.c	2015-05-15 17:33:56.710966848 +0800
+@@ -24,7 +24,7 @@
+ 			.iobase_phys	= HIGMAC0_IOBASE,
+ 		},
+ 		.mii_name		= "mdio0",
+-		.phy_intf		= CONFIG_HIGMAC_PHY1_INTERFACE_MODE,
++		.phy_intf		= interface_mode_rmii,
+ 		.phy_addr		= CONFIG_HIGMAC_PHY1_ADDR,
+ 	},
+ #if (CONFIG_GMAC_NUMS == 2)
+diff -Nrua a/include/configs/hi3516a.h b/include/configs/hi3516a.h
+--- a/include/configs/hi3516a.h	2015-03-10 15:12:36.000000000 +0800
++++ b/include/configs/hi3516a.h	2015-05-15 17:30:33.230967761 +0800
+@@ -369,8 +369,35 @@
+ #define CONFIG_SUPPORT_DMA_INT
+ #endif
+ 
+-/* #define CONFIG_AUDIO_ENABLE */
+-/* #define CONFIG_OSD_ENABLE */
++/*-----------------------------------------------------------------------
++ * Switch to uboot by key
++ */
++ 
++#define CONFIG_AUTOBOOT_KEYED 1
++#define CONFIG_AUTOBOOT_PROMPT "Press CTRL-C to abort autoboot in %2d seconds\n"
++#define CONFIG_AUTOBOOT_DELAY_STR "hilinux"
++#define CONFIG_AUTOBOOT_STOP_STR "\x03" 
++
++/*-----------------------------------------------------------------------
++ * watchdog       taoweijun 2015-2-3
++ * ----------------------------------------------------------------------*/
++//system
++#define HISILICON_SCTL_BASE 0x20050000
++/* define watchdog IO */
++#define HIWDT_BASE      0x20040000
++#define HIWDT_REG(x)    (HIWDT_BASE + (x))
++#define HIWDT_LOAD      0x000
++#define HIWDT_VALUE     0x004
++#define HIWDT_CTRL      0x008
++#define HIWDT_INTCLR    0x00C
++#define HIWDT_RIS       0x010
++#define HIWDT_MIS       0x014
++#define HIWDT_LOCK      0xC00
++#define HIWDT_UNLOCK_VAL    0x1ACCE551
++#define hiwdt_read(x)      readl(HIWDT_REG(x))
++#define hiwdt_write(v,x)   writel(v, HIWDT_REG(x))
++//#define hiwdt_time 0x0ABA9500
++#define hiwdt_time 0x060D4A80
+ 
+ #endif	/* __CONFIG_H */
+ 
